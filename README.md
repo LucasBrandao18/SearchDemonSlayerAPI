@@ -1,7 +1,3 @@
-# SearchDemonSlayerAPI
-
-Aplicação **Blazor WebAssembly em C# e .NET 10**, desenvolvida a partir do material `lista demon slayer.pdf`, do professor Daniel Henrique Matos de Paiva.
-
 ## O que foi solicitado
 
 - Criar um aplicativo Blazor WebAssembly em .NET 10 ou superior.
@@ -169,15 +165,3 @@ dotnet test "tests\SearchDemonSlayerAPI.Tests\SearchDemonSlayerAPI.Tests.csproj"
 Foram aprovados **16 testes com bUnit e xUnit**, que verificam a listagem inicial, navegação, limites da paginação, busca no servidor, codificação do nome, retorno à lista, ausência de resultados, respostas inválidas, falhas HTTP/rede, tempo limite, nova tentativa, bloqueio de consultas duplicadas, campos opcionais e carregamento da imagem.
 
 As respostas HTTP dos testes são simuladas para permitir verificação sem depender da disponibilidade da API. O projeto principal exclui a pasta `tests` da compilação e dos arquivos do aplicativo.
-
-## Publicação manual
-
-O `.gitignore` usa o modelo Visual Studio/.NET e ignora `bin/`, `obj/` e outros arquivos gerados. Essas pastas são recriadas automaticamente durante a compilação e não precisam ser enviadas ao GitHub.
-
-Publique o código-fonte e os arquivos de configuração do projeto. Depois, entregue o link no Google Classroom, conforme a atividade.
-
-## Referências
-
-- Material fornecido: `lista demon slayer.pdf`.
-- [Documentação da API](https://www.demonslayer-api.com/documentation).
-- [Primeira página de personagens](https://www.demonslayer-api.com/api/v1/characters?page=1).
