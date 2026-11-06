@@ -1,0 +1,7 @@
+.personagem { overflow-wrap: anywhere; }
+.retrato {
+    object-fit: contain;
+    height: 240px;
+    background: #f4f6f8;
+}
+.citacao { white-space: pre-line; }

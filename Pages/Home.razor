@@ -1,0 +1,169 @@
+﻿@page "/"
+
+@using System.Net
+@using System.Text.Json
+@using SearchDemonSlayerAPI.Models
+@using SearchDemonSlayerAPI.Components
+@inject HttpClient Http
+@implements IDisposable
+
+<PageTitle>Personagens de Demon Slayer</PageTitle>
+<h1>Personagens de Demon Slayer</h1>
+<p>Explore a lista ou busque pelo nome de um personagem.</p>
+
+<form class="busca mb-4" @onsubmit="Buscar" @onsubmit:preventDefault>
+    <label for="nome" class="form-label">Nome do personagem</label>
+    <input id="nome" class="form-control" placeholder="Ex.: Tanjiro, Nezuko ou Giyu"
+           @bind="nomeDigitado" @bind:event="oninput" disabled="@carregando" />
+    <div class="d-flex gap-2 mt-2 flex-wrap">
+        <button type="submit" class="btn btn-primary" disabled="@carregando">Buscar</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="ListarTodos" disabled="@carregando">Listar todos</button>
+    </div>
+</form>
+
+@if (carregando)
+{
+    <p role="status">Carregando personagens. Aguarde...</p>
+}
+else if (!string.IsNullOrEmpty(erro))
+{
+    <div class="alert alert-danger" role="alert">
+        <p>@erro</p>
+        <button class="btn btn-outline-danger" @onclick="TentarNovamente">Tentar novamente</button>
+    </div>
+}
+else if (personagens.Count == 0)
+{
+    <p class="alert alert-info" role="status">Nenhum personagem encontrado. Tente outro nome ou volte à lista.</p>
+}
+else
+{
+    <p role="status">
+        @(string.IsNullOrEmpty(buscaAtual)
+            ? $"{personagens.Count} personagens nesta página."
+            : $"{personagens.Count} resultado(s) para “{buscaAtual}”.")
+    </p>
+    @if (paginacao is not null)
+    {
+        <nav class="d-flex gap-3 align-items-center flex-wrap mb-3" aria-label="Paginação de personagens">
+            <button class="btn btn-outline-primary" @onclick="PaginaAnterior" disabled="@(paginacao.PaginaAtual <= 1)">Anterior</button>
+            <span>Página @paginacao.PaginaAtual de @paginacao.TotalPaginas · @paginacao.TotalPersonagens personagens</span>
+            <button class="btn btn-outline-primary" @onclick="ProximaPagina" disabled="@(paginacao.PaginaAtual >= paginacao.TotalPaginas)">Próxima</button>
+        </nav>
+    }
+    <div class="grade">
+        @foreach (var personagem in personagens)
+        {
+            <CartaoPersonagem @key="personagem" Dados="personagem" />
+        }
+    </div>
+}
+
+@code {
+    private string nomeDigitado = string.Empty;
+    private string? buscaAtual;
+    private string erro = string.Empty;
+    private List<Personagem> personagens = [];
+    private Paginacao? paginacao;
+    private bool carregando;
+    private int ultimaPagina = 1;
+    private string? ultimaBusca;
+    private readonly CancellationTokenSource cancelamento = new();
+
+    protected override Task OnInitializedAsync() => Carregar(1);
+
+    private Task Buscar() => Carregar(1, nomeDigitado.Trim());
+
+    private Task ListarTodos()
+    {
+        nomeDigitado = string.Empty;
+        return Carregar(1);
+    }
+
+    private Task TentarNovamente() => Carregar(ultimaPagina, ultimaBusca);
+    private Task PaginaAnterior() => paginacao is { PaginaAtual: > 1 }
+        ? Carregar(paginacao.PaginaAtual - 1) : Task.CompletedTask;
+    private Task ProximaPagina() => paginacao is not null && paginacao.PaginaAtual < paginacao.TotalPaginas
+        ? Carregar(paginacao.PaginaAtual + 1) : Task.CompletedTask;
+
+    private async Task Carregar(int pagina, string? busca = null)
+    {
+        if (carregando || pagina < 1)
+        {
+            return;
+        }
+
+        busca = string.IsNullOrWhiteSpace(busca) ? null : busca.Trim();
+        ultimaPagina = pagina;
+        ultimaBusca = busca;
+        buscaAtual = busca;
+        personagens = [];
+        paginacao = null;
+        erro = string.Empty;
+        carregando = true;
+
+        try
+        {
+            // Busca no servidor: alcança personagens de todas as páginas.
+            var caminho = busca is null
+                ? $"characters?page={pagina}"
+                : $"characters?name={Uri.EscapeDataString(busca)}";
+            using var resposta = await Http.GetAsync(caminho, cancelamento.Token);
+            if (resposta.StatusCode == HttpStatusCode.NotFound && busca is not null)
+            {
+                return; // A API usa 404 para busca sem resultados.
+            }
+            if (!resposta.IsSuccessStatusCode)
+            {
+                erro = "Não foi possível consultar a API no momento. Tente novamente.";
+                return;
+            }
+
+            var dados = await resposta.Content.ReadFromJsonAsync<RespostaPersonagens>(cancellationToken: cancelamento.Token);
+            if (dados?.Personagens is null ||
+                dados.Personagens.Any(p => p is null || p.Id <= 0 || string.IsNullOrWhiteSpace(p.Nome)))
+            {
+                erro = "A API retornou dados inválidos ou incompletos.";
+                return;
+            }
+
+            // A listagem inclui paginação; a busca por nome retorna apenas content.
+            if (busca is null && dados.Personagens.Count > 0 &&
+                (dados.Paginacao is null || dados.Paginacao.PaginaAtual != pagina ||
+                 dados.Paginacao.TotalPaginas < pagina))
+            {
+                erro = "A API retornou informações de paginação inválidas.";
+                return;
+            }
+
+            personagens = dados.Personagens.Select(p => p!).ToList();
+            paginacao = busca is null ? dados.Paginacao : null;
+        }
+        catch (OperationCanceledException) when (cancelamento.IsCancellationRequested)
+        {
+            // O componente foi encerrado e a requisição pendente foi cancelada.
+        }
+        catch (OperationCanceledException)
+        {
+            erro = "A consulta demorou demais. Tente novamente em alguns instantes.";
+        }
+        catch (HttpRequestException)
+        {
+            erro = "Não foi possível acessar a API. Verifique sua conexão e tente novamente.";
+        }
+        catch (JsonException)
+        {
+            erro = "A API retornou uma resposta em formato inválido.";
+        }
+        finally
+        {
+            carregando = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        cancelamento.Cancel();
+        cancelamento.Dispose();
+    }
+}

@@ -1,0 +1,36 @@
+@using SearchDemonSlayerAPI.Models
+
+<article class="card h-100 personagem">
+    @if (TemImagem && !falhaImagem)
+    {
+        <img class="card-img-top retrato" src="@Dados.Imagem" alt="@($"Imagem de {Dados.Nome}")"
+             width="300" height="240" @onerror="() => falhaImagem = true" />
+    }
+    else
+    {
+        <p class="alert alert-warning m-3" role="status">
+            @(falhaImagem ? "Não foi possível carregar a imagem deste personagem." : "Imagem não informada pela API.")
+        </p>
+    }
+    <div class="card-body">
+        <h2 class="h4">@Dados.Nome</h2>
+        <p><strong>Idade:</strong> @(Dados.Idade is null or < 0 ? "Não informada pela API" : Dados.Idade.Value.ToString())</p>
+        <p><strong>Raça:</strong> @Exibir(Dados.Raca)</p>
+        <h3 class="h6">Citação</h3>
+        <blockquote class="mb-0 citacao">@Exibir(Dados.Citacao)</blockquote>
+    </div>
+</article>
+
+@code {
+    [Parameter, EditorRequired]
+    public Personagem Dados { get; set; } = new();
+
+    private bool falhaImagem;
+    private bool TemImagem => Uri.TryCreate(Dados.Imagem, UriKind.Absolute, out var uri) &&
+                              uri.Scheme == Uri.UriSchemeHttps;
+
+    protected override void OnParametersSet() => falhaImagem = false;
+
+    private static string Exibir(string? texto) =>
+        string.IsNullOrWhiteSpace(texto) ? "Não informada pela API" : texto;
+}
